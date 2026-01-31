@@ -1,9 +1,10 @@
+
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Room Game — Time Maze</title>
+  <title>Room Game — Time Maze (GitHub Trigger)</title>
   <style>
     body {
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
@@ -14,8 +15,6 @@
       padding: 16px;
       background: #f6f7f9;
     }
-
-    /* Viewport */
     #room {
       width: min(560px, 94vw);
       height: min(560px, 94vw);
@@ -27,19 +26,14 @@
       overflow: hidden;
       touch-action: none;
     }
-
-    /* World uses fixed 560x560 coordinates and scales as a whole */
     #world {
       width: 560px;
       height: 560px;
       position: absolute;
-      left: 0;
-      top: 0;
+      left: 0; top: 0;
       transform-origin: top left;
       will-change: transform;
     }
-
-    /* Maze walls */
     .wall {
       position: absolute;
       background: rgba(17, 24, 39, 0.58);
@@ -48,12 +42,9 @@
       pointer-events: none;
       z-index: 2;
     }
-
-    /* Portals */
     .portal {
       position: absolute;
-      width: 26px;
-      height: 26px;
+      width: 26px; height: 26px;
       border-radius: 50%;
       pointer-events: none;
       z-index: 3;
@@ -66,12 +57,9 @@
     .portal.past {
       background: radial-gradient(circle at 35% 35%, rgba(34,211,238,0.98), rgba(34,211,238,0.25) 55%, rgba(0,0,0,0));
     }
-
-    /* Aliens */
     .alien {
       position: absolute;
-      width: 18px;
-      height: 18px;
+      width: 18px; height: 18px;
       border-radius: 50%;
       pointer-events: none;
       z-index: 9;
@@ -79,23 +67,16 @@
       box-shadow: 0 6px 14px rgba(0,0,0,0.18), inset 0 0 0 2px rgba(255,255,255,0.24);
       opacity: 0.95;
     }
-
-    /* White door */
     #door {
-      width: 110px;
-      height: 210px;
-      position: absolute;
-      left: 16px;
-      top: 175px;
+      width: 110px; height: 210px;
+      position: absolute; left: 16px; top: 175px;
       border-radius: 6px;
       z-index: 6;
-
       background: linear-gradient(90deg, #ffffff, #e9edf2 45%, #ffffff);
       box-shadow:
         inset 0 0 0 2px rgba(0,0,0,0.20),
         inset 0 0 0 8px rgba(255,255,255,0.45),
         0 10px 20px rgba(0,0,0,0.16);
-
       transform-origin: left center;
       transition: transform 180ms ease, filter 180ms ease, opacity 180ms ease;
     }
@@ -108,12 +89,25 @@
       z-index: -1;
       box-shadow: inset 0 0 0 2px rgba(255,255,255,0.10);
     }
+    #door.open {
+      transform: perspective(700px) rotateY(35deg);
+      filter: brightness(0.99);
+      opacity: 0.92;
+    }
+    #doorSign {
+      position: absolute;
+      left: 14px; top: 36px;
+      width: 84px; height: auto;
+      border-radius: 4px;
+      box-shadow: 0 3px 12px rgba(0,0,0,0.22);
+      user-select: none;
+      pointer-events: none;
+      z-index: 7;
+    }
     #knob {
       position: absolute;
-      left: 10px;
-      top: 138px;
-      width: 18px;
-      height: 18px;
+      left: 10px; top: 138px;
+      width: 18px; height: 18px;
       border-radius: 50%;
       background: radial-gradient(circle at 35% 35%, #f2f2f2, #9aa1aa 60%, #6c737d);
       box-shadow: inset 0 0 0 2px rgba(0,0,0,0.25), 0 2px 6px rgba(0,0,0,0.25);
@@ -121,10 +115,8 @@
       z-index: 8;
     }
     .hinge {
-      position: absolute;
-      right: 6px;
-      width: 10px;
-      height: 22px;
+      position: absolute; right: 6px;
+      width: 10px; height: 22px;
       border-radius: 3px;
       background: linear-gradient(180deg, #3a3f47, #1f2329);
       box-shadow: inset 0 0 0 1px rgba(255,255,255,0.10);
@@ -136,40 +128,8 @@
     #hinge2 { top: 92px; }
     #hinge3 { top: 154px; }
 
-    #doorSign {
-      position: absolute;
-      left: 14px;
-      top: 36px;
-      width: 84px;
-      height: auto;
-      border-radius: 4px;
-      box-shadow: 0 3px 12px rgba(0,0,0,0.22);
-      user-select: none;
-      pointer-events: none;
-      z-index: 7;
-    }
-    #door.open {
-      transform: perspective(700px) rotateY(35deg);
-      filter: brightness(0.99);
-      opacity: 0.92;
-    }
-
-    /* Explosion overlay */
-    #boom {
-      position: absolute;
-      inset: 0;
-      background: rgba(244,63,94,0.0);
-      pointer-events: none;
-      z-index: 20;
-      transition: background 120ms ease;
-    }
-    #boom.on {
-      background: rgba(244,63,94,0.45);
-    }
-
     #player {
-      width: 18px;
-      height: 18px;
+      width: 18px; height: 18px;
       background: #ff7a00;
       position: absolute;
       border-radius: 50%;
@@ -177,6 +137,15 @@
       outline: 2px solid rgba(255,255,255,0.65);
       z-index: 10;
     }
+
+    #boom {
+      position: absolute; inset: 0;
+      background: rgba(244,63,94,0.0);
+      pointer-events: none;
+      z-index: 20;
+      transition: background 120ms ease;
+    }
+    #boom.on { background: rgba(244,63,94,0.45); }
 
     .panel {
       display: flex;
@@ -187,20 +156,24 @@
       min-height: 44px;
       text-align: center;
     }
-
     button {
       border: 0;
       padding: 10px 14px;
       border-radius: 12px;
       background: #111827;
       color: white;
-      font-weight: 800;
+      font-weight: 900;
       cursor: pointer;
       user-select: none;
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
     }
-
+    .hint {
+      color: rgba(0,0,0,0.65);
+      font-size: 14px;
+      max-width: 560px;
+      line-height: 1.3;
+    }
     .hud {
       display: inline-flex;
       gap: 8px;
@@ -211,23 +184,8 @@
       box-shadow: 0 6px 14px rgba(0,0,0,0.08);
       font-weight: 900;
     }
-    .hud .mini {
-      font-size: 12px;
-      font-weight: 800;
-      opacity: 0.8;
-    }
-
-    .hint {
-      color: rgba(0,0,0,0.65);
-      font-size: 14px;
-      max-width: 560px;
-      line-height: 1.3;
-    }
-
-    #status {
-      min-height: 22px;
-      font-weight: 900;
-    }
+    .hud .mini { font-size: 12px; font-weight: 800; opacity: 0.8; }
+    #status { min-height: 22px; font-weight: 900; }
 
     .dpad {
       display: grid;
@@ -238,34 +196,22 @@
       align-items: center;
       justify-items: center;
     }
-
     .dpad button {
-      width: 56px;
-      height: 56px;
+      width: 56px; height: 56px;
       padding: 0;
       border-radius: 14px;
       font-size: 18px;
       line-height: 1;
     }
-
     .dpad .blank {
-      width: 56px;
-      height: 56px;
+      width: 56px; height: 56px;
       opacity: 0;
       pointer-events: none;
     }
-
     @media (max-width: 420px) {
-      .dpad {
-        grid-template-columns: 64px 64px 64px;
-        grid-template-rows: 64px 64px 64px;
-      }
-      .dpad button, .dpad .blank {
-        width: 64px;
-        height: 64px;
-      }
+      .dpad { grid-template-columns: 64px 64px 64px; grid-template-rows: 64px 64px 64px; }
+      .dpad button, .dpad .blank { width: 64px; height: 64px; }
     }
-
     .pill {
       display: inline-block;
       padding: 6px 10px;
@@ -273,15 +219,13 @@
       background: rgba(0,0,0,0.08);
       color: rgba(0,0,0,0.7);
       font-size: 12px;
-      font-weight: 800;
+      font-weight: 900;
     }
   </style>
 </head>
 <body>
-
   <div id="room" aria-label="Room">
     <div id="world">
-      <!-- walls injected -->
       <div id="portalF1" class="portal future" aria-hidden="true"></div>
       <div id="portalF2" class="portal future" aria-hidden="true"></div>
       <div id="portalP"  class="portal past"   aria-hidden="true"></div>
@@ -295,7 +239,6 @@
       </div>
 
       <div id="player" aria-label="Player"></div>
-
       <div id="alien1" class="alien" aria-hidden="true"></div>
       <div id="alien2" class="alien" aria-hidden="true"></div>
       <div id="alien3" class="alien" aria-hidden="true"></div>
@@ -307,11 +250,11 @@
   <div class="panel">
     <button id="openBtn" style="display:none;">Open</button>
     <div class="hint">
-      Arrows/WASD to move. Mobile: D-pad. Avoid aliens. Use portals. (Aliens wake up after 5s)
+      Find the perfect route + portal sequence to reach the door while avoiding all aliens.
       <div style="margin-top:6px; display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
         <span class="hud"><span class="mini">Timer</span> <span id="timerText">3:00</span></span>
         <span class="hud"><span class="mini">Timeline</span> <span id="timelineText">Stable</span></span>
-        <span id="mqttPill" class="pill">MQTT: not connected</span>
+        <span id="mqttPill" class="pill">Trigger: not configured</span>
       </div>
     </div>
   </div>
@@ -320,11 +263,9 @@
     <div class="blank"></div>
     <button id="btnUp" aria-label="Move up" type="button">▲</button>
     <div class="blank"></div>
-
     <button id="btnLeft" aria-label="Move left" type="button">◀</button>
     <div class="blank"></div>
     <button id="btnRight" aria-label="Move right" type="button">▶</button>
-
     <div class="blank"></div>
     <button id="btnDown" aria-label="Move down" type="button">▼</button>
     <div class="blank"></div>
@@ -332,21 +273,14 @@
 
   <div id="status"></div>
 
-  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-
   <script>
-    // MQTT
-    const MQTT_TOPIC  = "roomgame/door";
-    const MQTT_USERNAME = "mqtt_user";
-    const MQTT_PASSWORD = "ColdCase630!";
-
-    const MQTT_WS_URL = (() => {
-      const host = window.location.hostname || "homeassistant.local";
-      const isHttps = window.location.protocol === "https:";
-      return (isHttps ? "wss://" + host + ":8884/mqtt" : "ws://" + host + ":1884/mqtt");
-    })();
+    // Trigger (recommended for GitHub hosting): Node-RED HTTP endpoint
+    // Example: https://your-nodered-domain.com/roomgame/door
+    const TRIGGER_URL = ""; // <-- set this
+    const TRIGGER_PAYLOAD = { event: "doorsopen_plug_off" };
 
     const BASE = 560;
+    const W = 18;
 
     const room = document.getElementById("room");
     const world = document.getElementById("world");
@@ -356,7 +290,7 @@
     const playerEl = document.getElementById("player");
     const openBtn = document.getElementById("openBtn");
     const statusEl = document.getElementById("status");
-    const mqttPill = document.getElementById("mqttPill");
+    const pillEl = document.getElementById("mqttPill");
 
     const timerText = document.getElementById("timerText");
     const timelineText = document.getElementById("timelineText");
@@ -376,50 +310,63 @@
     const btnLeft = document.getElementById("btnLeft");
     const btnRight = document.getElementById("btnRight");
 
+    function setPill(t) { pillEl.textContent = t; }
+    function setStatus(t) { statusEl.textContent = t; }
+
+    // Maze (perimeter solid; interior fully connected; start lane widened)
     const walls = [
-      // perimeter (thickness 18)
-      {x: 0,   y: 0,   w: BASE, h: 18},
-      {x: 0,   y: BASE-18, w: BASE, h: 18},
-      {x: 0,   y: 0,   w: 18,  h: BASE},
-      {x: BASE-18, y: 0, w: 18, h: BASE},
+      {x: 0, y: 0, w: BASE, h: W},
+      {x: 0, y: BASE-W, w: BASE, h: W},
+      {x: 0, y: 0, w: W, h: BASE},
+      {x: BASE-W, y: 0, w: W, h: BASE},
 
-      // main pillars
-      {x: 140, y: 40,  w: 18, h: 430},
-      {x: 250, y: 90,  w: 18, h: 430},
-      {x: 360, y: 40,  w: 18, h: 430},
-      {x: 470, y: 110, w: 18, h: 410},
+      {x: 120, y: 40,  w: W, h: 190},
+      {x: 120, y: 270, w: W, h: 250},
 
-      // horizontals
-      {x: 60,  y: 120, w: 120, h: 18},
-      {x: 170, y: 200, w: 160, h: 18},
-      {x: 60,  y: 280, w: 210, h: 18},
-      {x: 300, y: 320, w: 120, h: 18},
-      {x: 80,  y: 400, w: 190, h: 18},
-      {x: 300, y: 460, w: 160, h: 18},
+      {x: 240, y: 80,  w: W, h: 170},
+      {x: 240, y: 290, w: W, h: 210},
 
-      // caps
-      {x: 410, y: 60,  w: 132, h: 18},
-      {x: 410, y: 520, w: 132, h: 18},
+      {x: 360, y: 40,  w: W, h: 210},
+      {x: 360, y: 300, w: W, h: 220},
+
+      // moved left (more dodging space at spawn)
+      {x: 420, y: 110, w: W, h: 140},
+      {x: 420, y: 300, w: W, h: 190},
+
+      {x: 60,  y: 120, w: 140, h: W},
+      {x: 170, y: 200, w: 150, h: W},
+      {x: 60,  y: 280, w: 230, h: W},
+      {x: 300, y: 340, w: 160, h: W},
+      {x: 70,  y: 410, w: 220, h: W},
+      {x: 300, y: 470, w: 170, h: W},
+
+      {x: 410, y: 60,  w: 140, h: W},
+      {x: 410, y: 520, w: 140, h: W},
     ];
 
     const doorRect = { x: 16, y: 175, w: 110, h: 210 };
 
     const portals = {
-      F1: { x: 430, y: 250, r: 14 },
-      F2: { x: 300, y: 150, r: 14 },
-      P:  { x: 210, y: 500, r: 14 },
+      F1: { x: 500, y: 90,  r: 14 },
+      F2: { x: 470, y: 500, r: 14 },
+      P:  { x: 70,  y: 60,  r: 14 },
     };
 
     const futureDestinations = [
-      { F1: { x: 120, y: 330 }, F2: { x: 75,  y: 160 } },
-      { F1: { x: 75,  y: 160 }, F2: { x: 120, y: 330 } },
+      { F1: { x: 85,  y: 170 }, F2: { x: 160, y: 320 } },
+      { F1: { x: 160, y: 320 }, F2: { x: 85,  y: 170 } },
     ];
 
-    const pSize = 18; // same as alien
+    const pastSetbacks = [
+      { x: 500, y: 320 },
+      { x: 500, y: 170 },
+    ];
+
+    const pSize = 18;
     const moveStep = 9;
 
     const aSize = 18;
-    const alienSpeed = 14;
+    const alienSpeed = 15;
 
     let px=0, py=0;
     let doorOpened = false;
@@ -427,21 +374,14 @@
     let lastTeleportMs = 0;
 
     let aliens = [
-      { x: 500, y: 110 },
-      { x: 420, y: 470 },
-      { x: 290, y: 520 },
+      { x: 500, y: 260 },
+      { x: 260, y: 120 },
+      { x: 170, y: 460 },
     ];
 
     let running = true;
     let remainingMs = 180000;
-    let aliensFrozenUntilMs = Date.now() + 7000;
     let lastFrame = performance.now();
-
-    let mqttClient = null;
-    let mqttConnected = false;
-
-    function setStatus(msg) { statusEl.textContent = msg; }
-    function setMqttPill(text) { mqttPill.textContent = text; }
 
     function updateScale() {
       const rect = room.getBoundingClientRect();
@@ -450,28 +390,19 @@
     }
 
     function rectsIntersect(a, b) {
-      return (
-        a.x < b.x + b.w &&
-        a.x + a.w > b.x &&
-        a.y < b.y + b.h &&
-        a.y + a.h > b.y
-      );
+      return (a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y);
     }
 
     function circleHit(cx, cy, r, x, y) {
-      const dx = cx - x;
-      const dy = cy - y;
+      const dx = cx - x, dy = cy - y;
       return (dx*dx + dy*dy) <= (r*r);
     }
 
     function canOccupy(nx, ny, w, h) {
       nx = Math.max(0, Math.min(BASE - w, nx));
       ny = Math.max(0, Math.min(BASE - h, ny));
-
       const r = { x: nx, y: ny, w, h };
-      for (const wv of walls) {
-        if (rectsIntersect(r, wv)) return null;
-      }
+      for (const wv of walls) if (rectsIntersect(r, wv)) return null;
       return { nx, ny };
     }
 
@@ -510,11 +441,7 @@
       playerEl.style.left = px + "px";
       playerEl.style.top  = py + "px";
 
-      const touchingDoor = rectsIntersect(
-        { x: px, y: py, w: pSize, h: pSize },
-        doorRect
-      );
-
+      const touchingDoor = rectsIntersect({ x: px, y: py, w: pSize, h: pSize }, doorRect);
       if (touchingDoor && !doorOpened && running) {
         openBtn.style.display = "inline-block";
         setStatus("You're at the door. Click Open.");
@@ -544,11 +471,11 @@
       if (ok) { px = ok.nx; py = ok.ny; }
     }
 
-    function setAliensStart() {
+    function resetAliens() {
       aliens = [
-        { x: 500, y: 110 },
-        { x: 420, y: 470 },
-        { x: 290, y: 520 },
+        { x: 500, y: 260 },
+        { x: 260, y: 120 },
+        { x: 170, y: 460 },
       ];
       for (let i=0;i<aliens.length;i++) {
         const ok = canOccupy(aliens[i].x, aliens[i].y, aSize, aSize);
@@ -565,14 +492,11 @@
       lastTeleportMs = 0;
 
       remainingMs = 180000;
-      aliensFrozenUntilMs = Date.now() + 7000;
       timerText.textContent = formatTime(remainingMs);
-
       boom.classList.remove("on");
-      door.style.filter = "";
 
       setPlayerStart();
-      setAliensStart();
+      resetAliens();
       updatePlayerUI();
       updateAliensUI();
 
@@ -585,18 +509,10 @@
       openBtn.style.display = "none";
       setStatus("💥 Door exploded. You died.");
       boom.classList.add("on");
-
-      let shakes = 0;
-      const shake = setInterval(() => {
-        shakes++;
-        door.style.transform = (shakes % 2 ? "translateX(2px)" : "translateX(-2px)");
-        if (shakes > 10) {
-          clearInterval(shake);
-          door.style.transform = "";
-          boom.classList.remove("on");
-          restartGame("Time ran out");
-        }
-      }, 60);
+      setTimeout(() => {
+        boom.classList.remove("on");
+        restartGame("Time ran out");
+      }, 850);
     }
 
     function dieAndRestart() {
@@ -607,7 +523,7 @@
       setTimeout(() => {
         boom.classList.remove("on");
         restartGame("Caught by aliens");
-      }, 700);
+      }, 750);
     }
 
     function tryMovePlayer(dir) {
@@ -635,8 +551,12 @@
       if (circleHit(cx, cy, portals.P.r, portals.P.x, portals.P.y)) {
         timelineState = 1 - timelineState;
         updateTimelineUI();
-        setStatus("⏳ Past changed the future!");
+        const setback = pastSetbacks[timelineState];
+        const ok = canOccupy(setback.x, setback.y, pSize, pSize);
+        if (ok) { px = ok.nx; py = ok.ny; }
         lastTeleportMs = now;
+        setStatus("⏳ Back in time! Future changed.");
+        updatePlayerUI();
         return;
       }
 
@@ -645,21 +565,17 @@
       if (circleHit(cx, cy, portals.F1.r, portals.F1.x, portals.F1.y)) {
         const dst = map.F1;
         const ok = canOccupy(dst.x, dst.y, pSize, pSize);
-        if (ok) {
-          px = ok.nx; py = ok.ny;
-          lastTeleportMs = now;
-          setStatus("⚡ Future warp!");
-          updatePlayerUI();
-        }
+        if (ok) { px = ok.nx; py = ok.ny; }
+        lastTeleportMs = now;
+        setStatus("⚡ Future jump!");
+        updatePlayerUI();
       } else if (circleHit(cx, cy, portals.F2.r, portals.F2.x, portals.F2.y)) {
         const dst = map.F2;
         const ok = canOccupy(dst.x, dst.y, pSize, pSize);
-        if (ok) {
-          px = ok.nx; py = ok.ny;
-          lastTeleportMs = now;
-          setStatus("⚡ Future warp!");
-          updatePlayerUI();
-        }
+        if (ok) { px = ok.nx; py = ok.ny; }
+        lastTeleportMs = now;
+        setStatus("⚡ Future jump!");
+        updatePlayerUI();
       }
     }
 
@@ -670,23 +586,30 @@
       const dy = (targetY - ay);
       const dist = Math.hypot(dx, dy) || 1;
 
-      const vx = (dx / dist) * alienSpeed * dtSec;
-      const vy = (dy / dist) * alienSpeed * dtSec;
+      const wobble = ((Math.sin((performance.now()/700) + a.x) + Math.cos((performance.now()/900) + a.y)) * 0.6);
+      const vx = (dx / dist) * alienSpeed * dtSec + wobble;
+      const vy = (dy / dist) * alienSpeed * dtSec - wobble;
 
       let ok = canOccupy(a.x + vx, a.y, aSize, aSize);
       if (ok) { a.x = ok.nx; a.y = ok.ny; }
+      else {
+        ok = canOccupy(a.x, a.y + Math.sign(vx)*2, aSize, aSize);
+        if (ok) { a.x = ok.nx; a.y = ok.ny; }
+      }
+
       ok = canOccupy(a.x, a.y + vy, aSize, aSize);
       if (ok) { a.x = ok.nx; a.y = ok.ny; }
+      else {
+        ok = canOccupy(a.x + Math.sign(vy)*2, a.y, aSize, aSize);
+        if (ok) { a.x = ok.nx; a.y = ok.ny; }
+      }
     }
 
     function checkAlienCollisions() {
       const pRect = { x: px, y: py, w: pSize, h: pSize };
       for (const a of aliens) {
         const aRect = { x: a.x, y: a.y, w: aSize, h: aSize };
-        if (rectsIntersect(pRect, aRect)) {
-          dieAndRestart();
-          return;
-        }
+        if (rectsIntersect(pRect, aRect)) { dieAndRestart(); return; }
       }
     }
 
@@ -701,15 +624,11 @@
       }
 
       if (running) {
-        if (Date.now() >= aliensFrozenUntilMs) {
-          const tx = px + pSize/2;
-          const ty = py + pSize/2;
-          const dtSec = dt / 1000;
-          for (let i=0;i<aliens.length;i++) {
-            moveAlienTowards(aliens[i], tx, ty, dtSec);
-          }
-          checkAlienCollisions();
-        }
+        const tx = px + pSize/2;
+        const ty = py + pSize/2;
+        const dtSec = dt / 1000;
+        for (let i=0;i<aliens.length;i++) moveAlienTowards(aliens[i], tx, ty, dtSec);
+        checkAlienCollisions();
         updateAliensUI();
       }
 
@@ -726,81 +645,47 @@
 
     function bindHold(el, dir) {
       let intervalId = null;
-
       const start = (e) => {
         if (e && e.cancelable) e.preventDefault();
         tryMovePlayer(dir);
         if (intervalId === null) intervalId = setInterval(() => tryMovePlayer(dir), 80);
       };
-
       const stop = (e) => {
         if (e && e.cancelable) e.preventDefault();
         if (intervalId !== null) { clearInterval(intervalId); intervalId = null; }
       };
-
       el.addEventListener("pointerdown", start);
       el.addEventListener("pointerup", stop);
       el.addEventListener("pointercancel", stop);
       el.addEventListener("pointerleave", stop);
-
       el.addEventListener("touchstart", start, { passive: false });
       el.addEventListener("touchend", stop, { passive: false });
       el.addEventListener("touchcancel", stop, { passive: false });
-
       el.addEventListener("mousedown", start);
       el.addEventListener("mouseup", stop);
       el.addEventListener("mouseleave", stop);
     }
-
     bindHold(btnUp, "up");
     bindHold(btnDown, "down");
     bindHold(btnLeft, "left");
     bindHold(btnRight, "right");
 
-    function connectMqtt() {
-      if (!window.mqtt) {
-        setMqttPill("MQTT: mqtt.js missing");
-        return;
-      }
-
-      mqttClient = window.mqtt.connect(MQTT_WS_URL, {
-        keepalive: 30,
-        reconnectPeriod: 2000,
-        connectTimeout: 8000,
-        clean: true,
-        username: MQTT_USERNAME,
-        password: MQTT_PASSWORD
-      });
-
-      mqttClient.on("connect", () => {
-        mqttConnected = true;
-        setMqttPill("MQTT: connected");
-      });
-
-      mqttClient.on("reconnect", () => {
-        mqttConnected = false;
-        setMqttPill("MQTT: reconnecting…");
-      });
-
-      mqttClient.on("close", () => {
-        mqttConnected = false;
-        setMqttPill("MQTT: disconnected");
-      });
-
-      mqttClient.on("error", (err) => {
-        mqttConnected = false;
-        setMqttPill("MQTT: error");
-        console.log("MQTT error:", err);
-      });
-    }
-
     function publishDoorsOpen() {
-      if (!mqttClient || !mqttConnected) return;
-      mqttClient.publish(
-        MQTT_TOPIC,
-        JSON.stringify({ event: "doorsopen_plug_off" }),
-        { qos: 0, retain: false }
-      );
+      if (!TRIGGER_URL) { setPill("Trigger: set TRIGGER_URL"); return; }
+      setPill("Trigger: sending…");
+      fetch(TRIGGER_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(TRIGGER_PAYLOAD)
+      })
+      .then(res => {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        setPill("Trigger: sent ✅");
+      })
+      .catch(err => {
+        console.log("Trigger error:", err);
+        setPill("Trigger: failed");
+      });
     }
 
     openBtn.addEventListener("click", () => {
@@ -821,18 +706,14 @@
     }
 
     window.addEventListener("load", () => {
-      connectMqtt();
+      setPill(TRIGGER_URL ? "Trigger: ready" : "Trigger: not configured");
       updateTimelineUI();
       timerText.textContent = formatTime(remainingMs);
-
       setPlayerStart();
-      setAliensStart();
-
+      resetAliens();
       layout();
-      setStatus("Aliens wake up in 5 seconds…");
       requestAnimationFrame(loop);
     });
-
     window.addEventListener("resize", layout);
   </script>
 </body>
