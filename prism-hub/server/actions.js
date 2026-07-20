@@ -65,19 +65,43 @@ function startMinigame(timer, minigameId, modeOverride = null) {
   const mode = modeOverride || session.mode;
   if (!manifest.enabled_modes.includes(mode)) throw new Error(`${manifest.name} is not enabled for ${mode}`);
 
-  // Quiz minigames: validate attempts/categories BEFORE any state changes so a
-  // blocked launch leaves everything untouched.
+  // Engine minigames validate BEFORE any state changes so a blocked launch
+  // leaves everything untouched.
   const isQuiz = manifest.ui_component === 'quiz';
+  const isGrid = manifest.ui_component === 'grid';
   const quizEngine = isQuiz ? require('./quiz') : null;
+  const gridEngine = isGrid ? require('./grid') : null;
   if (isQuiz) quizEngine.preflight(session.id, minigameId, mode, manifest[mode]);
+  if (isGrid) gridEngine.preflight(mode, manifest[mode]);
 
   db.prepare('UPDATE sessions SET active_minigame_id = ?, active_minigame_mode = ? WHERE id = ?')
     .run(minigameId, mode, session.id);
+  db.prepare('INSERT INTO minigame_launches (session_id, minigame_id, mode) VALUES (?, ?, ?)')
+    .run(session.id, minigameId, mode);
   timer.load(manifest[mode]?.timer_seconds ?? 300);
   fireNodeRed('minigame_start', { minigame_id: minigameId, mode, session_id: session.id }, manifest.nodered?.on_start);
+  const teams = db.prepare('SELECT * FROM teams WHERE session_id = ? ORDER BY id').all(session.id);
   if (isQuiz) {
-    const teams = db.prepare('SELECT * FROM teams WHERE session_id = ? ORDER BY id').all(session.id);
     quizEngine.launch({ sessionId: session.id, minigameId, mode, manifest, teams });
+  } else if (isGrid) {
+    gridEngine.launch({ sessionId: session.id, minigameId, mode, manifest, teams, timer });
+  } else if (mode === 'gameshow' && manifest.gameshow?.has_mole) {
+    // Generic minigame with a mole: Part 1 text-objective assignment. The quiz
+    // and grid engines run their own flows above.
+    const moleSys = require('./mole');
+    if (manifest.gameshow.randomize_mole_team !== false) {
+      try {
+        moleSys.assign({
+          sessionId: session.id, minigameId,
+          roundNumber: manifest.round_number ?? null,
+          settings: manifest.gameshow
+        });
+      } catch (err) {
+        // An empty objective library must never block a launch — the Admin
+        // mole panel shows the gap instead.
+        console.error(`[mole] assignment skipped: ${err.message}`);
+      }
+    }
   }
   broadcastState();
   return { minigame_id: minigameId, mode };
@@ -88,10 +112,12 @@ function endMinigame(timer, onEndGuard) {
   if (!session || !session.active_minigame_id) throw new Error('no active minigame');
   const manifest = getManifest(session.active_minigame_id);
 
-  // Quiz cleanup: finalize the run (scores/attempts/mole) if it hasn't ended
+  // Engine cleanup: finalize the run (scores/attempts/mole) if it hasn't ended
   // naturally, then clear the engine so the Stage returns to the leaderboard.
   const quizEngine = require('./quiz');
   if (quizEngine.isActive()) quizEngine.stop();
+  const gridEngine = require('./grid');
+  if (gridEngine.isActive()) gridEngine.stop();
 
   // Fire on_end only if timer expiry didn't already fire it.
   if (manifest && !onEndGuard.fired()) {

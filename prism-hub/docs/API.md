@@ -202,3 +202,88 @@ Same delivery rules as Phase 1 (POST to `<base>/prism/<event>`, 2s timeout).
 `buildState()` now includes `quiz_attempts`:
 `{ [minigame_id]: { used, max, scores[], counted_score } }` for each quiz
 minigame in the active session — what greys out an exhausted escape-room tile.
+
+# Phase 3 additions
+
+## Mole objectives (`/api/mole`)
+
+| Method & path | Body / query | Effect |
+|---|---|---|
+| `GET /mole/objectives` | — | `{ objectives[], warnings[] }` — warnings flag mole minigames with < 3 applicable objectives |
+| `POST /mole/objectives` | `{ text, minigame_ids[], reward, weight, active }` | Create. Empty `minigame_ids` = any minigame; `reward` null = minigame default |
+| `PUT /mole/objectives/:id` | any subset of the above | Update |
+| `POST /mole/objectives/:id/duplicate` | — | Copy (created inactive) |
+| `DELETE /mole/objectives/:id` | — | Hard delete, or soft (`active=0`) if ever assigned |
+| `POST /mole/assign` | `{ team_id? }` | Assign for the active minigame (omit team_id = random). Used when `randomize_mole_team` is off |
+| `POST /mole/assignment/:id/reroll` | — | Draw a different objective, re-deliver |
+| `POST /mole/assignment/:id/reassign` | `{ team_id }` | Move to another team, re-deliver |
+| `POST /mole/assignment/:id/resend` | — | Re-fire `mole.assigned` → `{ delivered }` |
+| `POST /mole/assignment/:id/clear` | — | Void the assignment, fire `mole.cleared` |
+| `POST /mole/assignment/:id/resolve` | `{ outcome: 'hit'\|'missed' }` | Host verdict. Hit writes the reward to the ledger (source `powerup`, undo-able) |
+
+The pending assignment rides the state snapshot as `state.mole` (Admin panel
+only — the Stage never renders it before the scoring reveal).
+
+## Color Grid (`/api/grid`)
+
+| Method & path | Body | Effect |
+|---|---|---|
+| `GET /grid` | — | Current grid snapshot (same shape as the `grid` socket event) |
+| `GET /grid/puzzles` | — | All puzzles with patterns |
+| `POST /grid/puzzles` | `{ name, rows, cols, pattern[][], difficulty, modes[] }` | Create (2×2 – 8×8) |
+| `PUT /grid/puzzles/:id` | any subset | Update / activate / deactivate |
+| `POST /grid/puzzles/:id/duplicate` | — | Copy (created inactive) |
+| `DELETE /grid/puzzles/:id` | — | Hard delete, or soft if used by a past round |
+| `POST /grid/cell` | `{ row, col, color }` | Admin manual fallback placement |
+| `POST /grid/score` | — | Score Now |
+| `POST /grid/reveal_again` | — | Repeat the reveal (escape room: always; game show: if `allow_repeat_reveal`; cost per `repeat_reveal_cost`) |
+
+## Run history (`/api/history`)
+
+| Method & path | Body / query | Effect |
+|---|---|---|
+| `GET /history/alltime` | — | Top 25 visible escape-room runs, ties → shorter duration |
+| `GET /history/monthly` | `?month=YYYY-MM` (omit = current) | Monthly top 25 + `months[]` for the picker |
+| `GET /history/recent` | `?mode=&from=&to=` (dates `YYYY-MM-DD`) | Every run newest-first, hidden ones flagged |
+| `GET /history/:id/archive` | — | Full session archive: ledger, mole assignments, launches, quiz runs, grid rounds |
+| `PUT /history/:id` | `{ team_name, player_names[], notes, visible }` | Post-run edits — never the score |
+| `GET /history/export.csv` | — | CSV of everything |
+
+## Inbound hook additions (`/api/hook`, token-gated)
+
+| Endpoint | Body | Effect |
+|---|---|---|
+| `POST /hook/grid/placement` | `{ row, col, color, tag_id, team }` | One cubby change (zero-indexed from top-left as players face the shelves — see COLOR_GRID.md) |
+| `POST /hook/grid/state` | `{ cells: [[...]] }` | Full shelf resync |
+| `POST /hook/grid/score` | `{}` | Force scoring |
+
+## Socket.IO additions
+
+| Event | Direction | Payload |
+|---|---|---|
+| `grid` | Hub → clients | Grid snapshot. **During the build phase the target pattern is absent from the payload** (server-filtered, not CSS-hidden). |
+
+## New outbound Node-RED events
+
+`mole.*` events go to **Settings → Mole delivery URL** (falls back to the base URL).
+
+| Event | Payload |
+|-------|---------|
+| `mole.assigned` | `{ session_id, minigame_id, round_number, team, team_name, objective, reward }` |
+| `mole.rerolled` | same as `mole.assigned` |
+| `mole.cleared` | `{ session_id, minigame_id, team }` |
+| `mole.resolved` | `{ team, objective, outcome, reward_awarded }` |
+| `grid.started` | `{ puzzle_id, rows, cols, mode }` |
+| `grid.reveal_start` / `grid.reveal_end` | `{ round_id, ... }` |
+| `grid.build_start` | `{ round_id }` |
+| `grid.scored` | `{ scores: {color: correct_count}, perfect }` |
+| `run.completed` | `{ team_name, final_chroma, duration_sec, mode }` |
+| `run.record_set` | `{ team_name, rank, scope: 'alltime'\|'monthly' }` — fired when a run enters the top 10 |
+
+## State snapshot additions
+
+- `state.mole` — newest pending mole assignment (`team`, snapshotted
+  `objective_text`, `reward`, `delivered`, `auto_scored`) or `null`
+- `state.last_run` — after an escape-room session ends (until the next session
+  starts): `{ team_name, final_chroma, duration_sec, rank_alltime,
+  rank_monthly, made_top25 }` — drives the Stage end-of-run screen

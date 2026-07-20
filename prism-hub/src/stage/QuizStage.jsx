@@ -6,7 +6,7 @@ import { teamHex } from '../hub.jsx';
 // Note: the snapshot carries mole_team_id for the Admin panel; this component
 // deliberately never renders it until the `ended` reveal.
 
-function CountdownRing({ remaining_ms, total_seconds }) {
+export function CountdownRing({ remaining_ms, total_seconds }) {
   const R = 54, C = 2 * Math.PI * R;
   const frac = Math.max(0, Math.min(1, remaining_ms / (total_seconds * 1000)));
   const secs = Math.ceil(remaining_ms / 1000);

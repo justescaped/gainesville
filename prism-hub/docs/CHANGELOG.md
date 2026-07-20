@@ -75,3 +75,46 @@ scoring/timing/rendering logic — plus physical button input.
 
 ### Deliberately out of scope (Phase 3)
 Color Grid (#6), interactive Player surface, buzz-in mechanics, audio/lighting.
+
+## Phase 3 — Mole Objectives, Color Grid, Run History
+
+Final core phase. The Player surface was **removed from scope** (revised
+plan): mole objectives are text delivered via Node-RED to any device, so team
+tablets are unnecessary. `/player` stays a reserved stub ("Not in use").
+
+### Included
+- **Mole objective system** — admin-editable text objective library (13
+  seeded) with per-minigame tagging, weighted draw, and reward overrides.
+  Random (or admin-picked) assignment on launch of any `has_mole` minigame;
+  one `mole.assigned` webhook to a dedicated URL delivers the secret to
+  whatever device the room uses. Collapsed "MOLE — DO NOT SHOW" Admin panel
+  with reroll / reassign / resend / clear / Hit / Missed; Hit pays through the
+  normal ledger (undo works). Objective text snapshotted into assignments;
+  delivery failures warn but never block. Trivia's exact-score mole retrofitted
+  to fire the same event with a generated objective (still auto-scored).
+- **Color Grid (#6)** — `ui_component: "grid"` engine: reveal → build →
+  scored. Puzzle builder (2×2–8×8, tap/palette painting, 6 seeded puzzles
+  across three difficulties), difficulty filter per mode. Append-only RFID
+  placements via 3 token-gated hooks (incremental + full-resync + force-score),
+  Admin tap-to-cycle manual fallback. Game show: per-color scoring, wrong-cell
+  penalty option, perfect bonus, optional paid repeat reveal, mole reveal at
+  scoring. Escape room: `require_exact` instant completion converting remaining
+  seconds to Chroma, always-available Reveal Again hint. **The target pattern
+  is stripped from the build-phase payload — server-filtered, not CSS-hidden.**
+  Colors pair with shape glyphs (▲ ■ ● ◆) for colorblind viewers and
+  compressed livestreams.
+- **Run history** — run_history extended (player names, minigames played,
+  notes, visible flag for staff test runs). New History nav: All-Time top 25,
+  Monthly with month picker, Recent with filters, and a per-run session
+  archive (full ledger, mole assignments, grid rounds) with CSV export.
+  Stage end-of-run screen with all-time/monthly rank and a top-25/record
+  celebration; `run.completed` on every session end and `run.record_set` on
+  top-10 entries. 5 sample runs seeded so the boards demo immediately.
+- **Docs:** MOLE_SYSTEM.md, COLOR_GRID.md (cell-addressing diagram);
+  API/DATA_MODEL updates; ADDING_A_MINIGAME custom-`ui_component` walkthrough
+  now uses Color Grid as the reference implementation.
+
+### Deliberately out of scope
+Player tablet surface (removed — Node-RED delivers mole objectives), grid-based
+mole patterns (replaced by text objectives), minigames #7–20 (manifest drops),
+audio/lighting (Node-RED + Home Assistant).

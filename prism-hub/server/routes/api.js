@@ -8,7 +8,7 @@ const router = express.Router();
 
 const { db, getSetting, setSetting, activeSession, chromaForTeam } = require('../db');
 const { allManifests, getManifest, saveManifest, fireNodeRed } = require('../core');
-const { buildState, broadcastState, pushBanner } = require('../state');
+const { buildState, broadcastState, pushBanner, setLastRun } = require('../state');
 const actions = require('../actions');
 
 function handle(fn) {
@@ -51,6 +51,7 @@ router.post('/sessions', handle((req) => {
     return sid;
   });
   const sid = create();
+  setLastRun(null); // a new playthrough clears the Stage end-of-run screen
   fireNodeRed('session_started', { session_id: sid, mode });
   broadcastState();
   return { session_id: sid };
@@ -59,14 +60,45 @@ router.post('/sessions', handle((req) => {
 router.post('/sessions/end', handle((req) => {
   const session = activeSession();
   if (!session) throw new Error('no active session');
-  const duration = Math.round((Date.now() - new Date(session.started_at + 'Z').getTime()) / 1000);
-  const insHist = db.prepare('INSERT INTO run_history (session_id, mode, team_name, final_chroma, duration_seconds) VALUES (?, ?, ?, ?, ?)');
+  const duration = Math.max(0, Math.round((Date.now() - new Date(session.started_at + 'Z').getTime()) / 1000));
+
+  // Everything this session actually played, for the archive record.
+  const played = db.prepare('SELECT minigame_id FROM minigame_launches WHERE session_id = ? GROUP BY minigame_id ORDER BY MIN(id)')
+    .all(session.id).map((r) => r.minigame_id);
+
+  const insHist = db.prepare('INSERT INTO run_history (session_id, mode, team_name, final_chroma, duration_seconds, minigames_played) VALUES (?, ?, ?, ?, ?, ?)');
+  const records = [];
   for (const t of db.prepare('SELECT * FROM teams WHERE session_id = ?').all(session.id)) {
-    insHist.run(session.id, session.mode, t.name, chromaForTeam(t.id), Math.max(0, duration));
+    const chroma = chromaForTeam(t.id);
+    insHist.run(session.id, session.mode, t.name, chroma, duration, JSON.stringify(played));
+    records.push({ team_name: t.name, final_chroma: chroma });
   }
   db.prepare("UPDATE sessions SET status = 'complete', ended_at = datetime('now'), active_minigame_id = NULL, active_minigame_mode = NULL WHERE id = ?").run(session.id);
   req.app.locals.timer.load(0);
   fireNodeRed('session_ended', { session_id: session.id, mode: session.mode });
+
+  for (const r of records) {
+    fireNodeRed('run.completed', { team_name: r.team_name, final_chroma: r.final_chroma, duration_sec: duration, mode: session.mode });
+  }
+
+  // Escape room: rank the run and drive the Stage end-of-run screen.
+  if (session.mode === 'escaperoom' && records.length) {
+    const run = records[0];
+    const rankRow = (whereMonth) => db.prepare(`
+      SELECT COUNT(*) + 1 AS rank FROM run_history
+      WHERE mode = 'escaperoom' AND visible = 1 AND session_id != ?
+        ${whereMonth ? "AND strftime('%Y-%m', ended_at) = strftime('%Y-%m', 'now')" : ''}
+        AND (final_chroma > ? OR (final_chroma = ? AND duration_seconds < ?))`)
+      .get(session.id, run.final_chroma, run.final_chroma, duration).rank;
+    const rankAlltime = rankRow(false);
+    const rankMonthly = rankRow(true);
+    if (rankAlltime <= 10) fireNodeRed('run.record_set', { team_name: run.team_name, rank: rankAlltime, scope: 'alltime' });
+    else if (rankMonthly <= 10) fireNodeRed('run.record_set', { team_name: run.team_name, rank: rankMonthly, scope: 'monthly' });
+    setLastRun({
+      team_name: run.team_name, final_chroma: run.final_chroma, duration_sec: duration,
+      rank_alltime: rankAlltime, rank_monthly: rankMonthly, made_top25: rankAlltime <= 25
+    });
+  }
   broadcastState();
 }));
 
@@ -267,11 +299,12 @@ router.get('/settings', handle(() => ({
   admin_pin: getSetting('admin_pin'),
   inbound_token: getSetting('inbound_token'),
   nodered_base_url: getSetting('nodered_base_url'),
-  manifest_push_url: getSetting('manifest_push_url')
+  manifest_push_url: getSetting('manifest_push_url'),
+  mole_webhook_url: getSetting('mole_webhook_url')
 })));
 
 router.put('/settings', handle((req) => {
-  for (const key of ['admin_pin', 'inbound_token', 'nodered_base_url', 'manifest_push_url']) {
+  for (const key of ['admin_pin', 'inbound_token', 'nodered_base_url', 'manifest_push_url', 'mole_webhook_url']) {
     if (req.body[key] !== undefined) setSetting(key, String(req.body[key]));
   }
 }));
@@ -284,7 +317,9 @@ router.get('/nodered/log', handle(() => ({
 
 router.post('/nodered/test', handle((req) => {
   const event = req.body.event || 'test';
-  fireNodeRed(event, { test: true, note: 'fired from the Node-RED diagnostics panel' });
+  // mole.* tests exercise the dedicated delivery URL, like the real events do.
+  const override = event.startsWith('mole.') ? getSetting('mole_webhook_url') : undefined;
+  fireNodeRed(event, { test: true, note: 'fired from the Node-RED diagnostics panel' }, override);
 }));
 
 // ---------- run history ----------

@@ -156,6 +156,90 @@ CREATE TABLE IF NOT EXISTS question_results (
 );
 CREATE INDEX IF NOT EXISTS idx_results_run ON question_results(run_id);
 
+-- ============ Phase 3: mole objectives ============
+-- Text objectives delivered via Node-RED (mole.assigned). The Hub never
+-- displays the objective on Stage; delivery hardware is Node-RED's problem.
+-- See docs/MOLE_SYSTEM.md.
+CREATE TABLE IF NOT EXISTS mole_objectives (
+  id           TEXT PRIMARY KEY,
+  text         TEXT NOT NULL,
+  minigame_ids TEXT NOT NULL DEFAULT '[]',   -- JSON array; [] = usable with any minigame
+  modes        TEXT NOT NULL DEFAULT '["gameshow"]',
+  reward       INTEGER,                      -- null = use the minigame's mole_reward
+  weight       INTEGER NOT NULL DEFAULT 1,   -- higher = drawn more often
+  active       INTEGER NOT NULL DEFAULT 1,
+  created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS mole_assignments (
+  id             TEXT PRIMARY KEY,
+  session_id     INTEGER NOT NULL,
+  minigame_id    TEXT NOT NULL,
+  round_number   INTEGER,
+  team_id        INTEGER NOT NULL,
+  objective_id   TEXT,                        -- null for auto-generated (trivia exact-score)
+  objective_text TEXT NOT NULL,               -- snapshot; survives edits to the library
+  reward         INTEGER NOT NULL DEFAULT 0,
+  outcome        TEXT NOT NULL DEFAULT 'pending' CHECK (outcome IN ('pending','hit','missed','voided')),
+  auto_scored    INTEGER NOT NULL DEFAULT 0,  -- trivia exact-score moles resolve themselves
+  delivered      INTEGER NOT NULL DEFAULT 0,  -- did the mole.assigned webhook succeed
+  assigned_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  resolved_at    TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_mole_session ON mole_assignments(session_id, outcome);
+
+-- ============ Phase 3: Color Grid ============
+-- Append-only placements, like the Chroma ledger: current shelf state is the
+-- latest placement per cell, and the full history replays for dispute review.
+CREATE TABLE IF NOT EXISTS grid_puzzles (
+  id         TEXT PRIMARY KEY,
+  name       TEXT NOT NULL,
+  rows       INTEGER NOT NULL,
+  cols       INTEGER NOT NULL,
+  pattern    TEXT NOT NULL,                   -- JSON 2D array: 'red'|'blue'|'green'|'yellow'|'empty'
+  difficulty TEXT NOT NULL DEFAULT 'medium' CHECK (difficulty IN ('easy','medium','hard')),
+  modes      TEXT NOT NULL DEFAULT '["gameshow","escaperoom"]',
+  active     INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS grid_rounds (
+  id                 TEXT PRIMARY KEY,
+  session_id         INTEGER NOT NULL,
+  puzzle_id          TEXT NOT NULL,
+  mode               TEXT NOT NULL,
+  mole_assignment_id TEXT,
+  reveal_seconds     INTEGER NOT NULL,
+  final_state        TEXT,                    -- JSON snapshot at scoring
+  scores             TEXT,                    -- JSON { team_id: correct_count }
+  started_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  ended_at           TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_grid_rounds_session ON grid_rounds(session_id);
+
+CREATE TABLE IF NOT EXISTS grid_placements (
+  id        TEXT PRIMARY KEY,
+  round_id  TEXT NOT NULL REFERENCES grid_rounds(id),
+  row       INTEGER NOT NULL,
+  col       INTEGER NOT NULL,
+  color     TEXT NOT NULL,                    -- 'red'|'blue'|'green'|'yellow'|'empty'
+  tag_id    TEXT,
+  team_id   INTEGER,
+  placed_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_grid_placements_round ON grid_placements(round_id, row, col);
+
+-- Phase 3: every minigame launch, so run_history.minigames_played is complete
+-- even for games that never wrote a Chroma entry.
+CREATE TABLE IF NOT EXISTS minigame_launches (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id  INTEGER NOT NULL,
+  minigame_id TEXT NOT NULL,
+  mode        TEXT NOT NULL,
+  launched_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_launches_session ON minigame_launches(session_id);
+
 -- Rolling diagnostics log of Node-RED traffic (both directions).
 CREATE TABLE IF NOT EXISTS nodered_log (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -175,12 +259,25 @@ if (!db.prepare("PRAGMA table_info(chroma_ledger)").all().some((c) => c.name ===
   db.exec('ALTER TABLE chroma_ledger ADD COLUMN quiz_run_id TEXT');
 }
 
+// Phase 3 extends run_history into the leaderboard/archive record.
+{
+  const cols = db.prepare('PRAGMA table_info(run_history)').all().map((c) => c.name);
+  if (!cols.includes('player_names')) db.exec('ALTER TABLE run_history ADD COLUMN player_names TEXT');
+  if (!cols.includes('minigames_played')) db.exec("ALTER TABLE run_history ADD COLUMN minigames_played TEXT NOT NULL DEFAULT '[]'");
+  if (!cols.includes('notes')) db.exec('ALTER TABLE run_history ADD COLUMN notes TEXT');
+  // visible=0 hides staff test runs from the public boards without deleting them.
+  if (!cols.includes('visible')) db.exec('ALTER TABLE run_history ADD COLUMN visible INTEGER NOT NULL DEFAULT 1');
+}
+
 // ---------- settings ----------
 const DEFAULT_SETTINGS = {
   admin_pin: '1234',
   inbound_token: 'prism',
   nodered_base_url: '',        // e.g. http://nodered.local:1880 — outbound events POST to <base>/prism/<event>
   manifest_push_url: '',       // saved minigame configs are POSTed here for Pis to pick up
+  // Phase 3: mole.assigned goes to its own URL — it usually points at a different
+  // device than everything else (bench screen, receipt printer, TTS speaker).
+  mole_webhook_url: '',
   // Phase 2: physical button map. Stage forwards raw event.code values; the Hub
   // maps them to actions here. Editable in Settings → Input (with Learn mode).
   button_map: JSON.stringify({ A: 'F13', B: 'F14', C: 'F15', D: 'F16', PASS: 'F17' })
@@ -278,6 +375,87 @@ if (db.prepare('SELECT COUNT(*) AS c FROM question_banks').get().c === 0) {
   q(ppRiddle, 'The more you take, the more you leave behind. What are they?', [['Memories'], ['Footsteps', true], ['Photos'], ['Coins']]);
 }
 
+// ---------- Phase 3 seeds: mole objectives ----------
+if (db.prepare('SELECT COUNT(*) AS c FROM mole_objectives').get().c === 0) {
+  const { randomUUID } = require('crypto');
+  const ins = db.prepare('INSERT INTO mole_objectives (id, text, minigame_ids, reward, weight) VALUES (?, ?, ?, ?, ?)');
+  const seed = (text, minigameIds = [], reward = null, weight = 1) =>
+    ins.run(randomUUID(), text, JSON.stringify(minigameIds), reward, weight);
+
+  seed('Get your color into at least 2 corners.', ['color_grid']);
+  seed('Make sure at least 3 cells end up wrong.', ['color_grid']);
+  seed('Never let two of the same color sit next to each other.', ['color_grid']);
+  seed('Fill an entire edge row or column with your color.', ['color_grid']);
+  seed('Trade away every one of your own blocks before time runs out.', ['you_gave_me_your_word']);
+  seed('End the round holding blocks from all four colors.', ['you_gave_me_your_word']);
+  seed('Convince another team to make an obviously bad trade.', []);
+  seed('Finish the round with fewer points than the team on your left.', []);
+  seed('Get another team accused of being the mole.', [], null, 2);
+  seed('Say the word "prism" out loud at least five times.', []);
+  seed('Make sure your team never agrees on anything.', []);
+  seed('Celebrate loudly every time an opposing team scores.', []);
+  seed('Volunteer to go first, then take as long as possible.', []);
+}
+
+// ---------- Phase 3 seeds: Color Grid puzzles ----------
+if (db.prepare('SELECT COUNT(*) AS c FROM grid_puzzles').get().c === 0) {
+  const { randomUUID } = require('crypto');
+  const ins = db.prepare('INSERT INTO grid_puzzles (id, name, rows, cols, pattern, difficulty) VALUES (?, ?, ?, ?, ?, ?)');
+  const P = (name, difficulty, pattern) =>
+    ins.run(randomUUID(), name, pattern.length, pattern[0].length, JSON.stringify(pattern), difficulty);
+  const _ = 'empty', r = 'red', b = 'blue', g = 'green', y = 'yellow';
+
+  P('Corners', 'easy', [
+    [r, _, b],
+    [_, g, _],
+    [y, _, r]
+  ]);
+  P('Cross', 'easy', [
+    [_, b, _],
+    [b, r, b],
+    [_, b, _]
+  ]);
+  P('Checker Four', 'medium', [
+    [r, b, r, b],
+    [b, r, b, r],
+    [g, y, g, y],
+    [y, g, y, g]
+  ]);
+  P('Diagonal Run', 'medium', [
+    [g, _, _, y],
+    [_, g, y, _],
+    [_, y, g, _],
+    [y, _, _, g]
+  ]);
+  P('Prism Burst', 'hard', [
+    [_, _, r, _, _],
+    [_, r, y, r, _],
+    [r, y, b, y, r],
+    [_, r, y, r, _],
+    [_, _, r, _, _]
+  ]);
+  P('The Wall', 'hard', [
+    [b, b, _, g, g, _],
+    [b, _, r, r, _, g],
+    [_, r, y, y, r, _],
+    [_, r, y, y, r, _],
+    [g, _, r, r, _, b],
+    [g, g, _, b, b, _]
+  ]);
+}
+
+// ---------- Phase 3 seeds: sample run records (so History demos immediately) ----------
+if (db.prepare('SELECT COUNT(*) AS c FROM run_history').get().c === 0) {
+  const ins = db.prepare(`
+    INSERT INTO run_history (session_id, mode, team_name, final_chroma, duration_seconds, ended_at, player_names, minigames_played, notes)
+    VALUES (0, 'escaperoom', ?, ?, ?, datetime('now', ?), ?, ?, 'Sample seed data — edit or hide from the History page')`);
+  ins.run('The Chromanauts', 1240, 3480, '-2 days', JSON.stringify(['Ava', 'Ben', 'Cody']), JSON.stringify(['trivia_twist', 'color_grid']));
+  ins.run('Grey Matter', 980, 3620, '-9 days', null, JSON.stringify(['puzzle_pass', 'color_grid']));
+  ins.run('Hue Dunnit', 1105, 3300, '-16 days', JSON.stringify(['Dana', 'Eli']), JSON.stringify(['trivia_twist', 'puzzle_pass']));
+  ins.run('Spectrum Squad', 860, 3555, '-40 days', null, JSON.stringify(['color_grid']));
+  ins.run('Full Saturation', 1330, 3140, '-70 days', JSON.stringify(['Finn', 'Gio', 'Hana', 'Iris']), JSON.stringify(['trivia_twist', 'puzzle_pass', 'color_grid']));
+}
+
 // ---------- helpers ----------
 function activeSession() {
   return db.prepare("SELECT * FROM sessions WHERE status != 'complete' ORDER BY id DESC LIMIT 1").get() || null;
@@ -309,8 +487,9 @@ function logNodeRed(direction, event, url, payload, status) {
 }
 
 function bests() {
-  const alltime = db.prepare("SELECT MAX(final_chroma) AS v FROM run_history WHERE mode = 'escaperoom'").get().v;
-  const monthly = db.prepare("SELECT MAX(final_chroma) AS v FROM run_history WHERE mode = 'escaperoom' AND strftime('%Y-%m', ended_at) = strftime('%Y-%m', 'now')").get().v;
+  // visible=0 rows are staff test runs — excluded from every public board.
+  const alltime = db.prepare("SELECT MAX(final_chroma) AS v FROM run_history WHERE mode = 'escaperoom' AND visible = 1").get().v;
+  const monthly = db.prepare("SELECT MAX(final_chroma) AS v FROM run_history WHERE mode = 'escaperoom' AND visible = 1 AND strftime('%Y-%m', ended_at) = strftime('%Y-%m', 'now')").get().v;
   return { monthly: monthly ?? null, alltime: alltime ?? null };
 }
 

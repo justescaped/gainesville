@@ -90,3 +90,52 @@ POST /api/hook/minigame/end
 
 A wrong or missing token returns **401** and is logged as `401 bad token` — the
 first thing to check if inbound posts "do nothing."
+
+---
+
+## Phase 3: mole delivery flow
+
+`mole.assigned` (and the other `mole.*` events) POST to **Settings → Mole
+delivery URL** — keep it separate from your main event flow, since it usually
+points at a different physical device. The minimal receiver:
+
+```
+[http in: POST /prism/mole] → [switch on msg.payload.event] → delivery node → [http response 200]
+```
+
+Delivery node ideas (all stock or one palette install away):
+- **Thermal receipt printer** (node-red-contrib-escpos or a python-shell to
+  python-escpos): print `msg.payload.team_name`, the objective, and the
+  reward — a physical secret card the mole pockets. ~$40 of hardware.
+- **Bench screen**: a `ui_text` on a small dashboard shown only at the mole's
+  bench, cleared on `mole.resolved`.
+- **TTS**: pipe `msg.payload.objective` to a speaker in a headset.
+
+Payload you'll receive:
+
+```json
+{
+  "event": "mole.assigned",
+  "team": "blue",
+  "team_name": "Team Blue",
+  "minigame_id": "color_grid",
+  "objective": "Get blue into at least 2 corners.",
+  "reward": 250
+}
+```
+
+Always return 200 quickly — the Hub records non-2xx/timeouts as
+`delivered: false` and shows the host a "read it aloud or resend" warning.
+
+## Phase 3: Color Grid RFID flow
+
+The shelf Pi POSTs placements as they happen and a full snapshot on boot:
+
+```
+[rfid reader event] → [function: build {row, col, color, tag_id}]
+  → [http request POST http://<hub>:3000/api/hook/grid/placement, X-Prism-Token header]
+```
+
+Cell addressing is zero-indexed from the top-left **as players face the
+shelves** — verify with one object in the top-left cubby before show night
+(see COLOR_GRID.md for the diagram and the resync endpoint).

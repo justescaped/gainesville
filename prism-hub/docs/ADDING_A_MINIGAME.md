@@ -78,22 +78,53 @@ Phase 1 ships #1; #2 and #3 build on these same manifests:
    via `POST /api/hook/chroma` (or `/minigame/end`), tagged with its
    `inbound_key`. The Hub applies it through the same ledger.
 
-## Extension point: a custom Stage view (`ui_component`)
+## Extension point: a custom `ui_component` — worked example: Color Grid
 
-Phase 1 renders every active minigame with the generic timer screen
-(`src/stage/Stage.jsx → ActiveMinigame`). To give a minigame a bespoke Stage
-visual later:
+The generic timer screen (`src/stage/Stage.jsx → ActiveMinigame`) covers any
+manifest with `ui_component: null`. Two engines ship as reference
+implementations: `"quiz"` (Phase 2) and `"grid"` (Phase 3). **Color Grid is
+the one to copy** — it's the smaller of the two and touches every layer.
+Follow its file trail to add a hypothetical `"color_clash"`:
 
-1. Set `"ui_component": "color_clash"` in the manifest.
-2. In `Stage.jsx`, before falling through to `<ActiveMinigame>`, branch on
-   `active.ui_component` and render your component, e.g.:
+1. **Manifest** — `minigames/color_grid.json` sets `"ui_component": "grid"`
+   plus its engine-specific settings inside the per-mode blocks. Your new
+   manifest sets `"ui_component": "color_clash"` and whatever settings your
+   engine reads.
+
+2. **Server engine** — `server/grid.js`. The pattern:
+   - a module-level state object (one active round or `null`), a `snapshot()`
+     that returns ONLY what clients may see, and `setEmitter()` so
+     `index.js` can broadcast it (`io.emit('grid', snap)`)
+   - `preflight(mode, settings)` — throw to block a bad launch *before* any
+     state changes
+   - `launch({ sessionId, minigameId, mode, manifest, teams, timer })`,
+     `stop()`, `isActive()`, `onTimerExpired()`
+   - all Chroma through `actions().writeChroma(...)` — never touch totals
+   Note grid.js's snapshot discipline: during the build phase the target is
+   *omitted from the payload*, not hidden client-side. If your minigame has a
+   secret, filter it server-side the same way.
+
+3. **Wire the engine** — three one-line hookups, all visible by grepping
+   `gridEngine` in:
+   - `server/actions.js` (`startMinigame` preflight + launch, `endMinigame` stop)
+   - `server/index.js` (emitter, timer-expiry hook, snapshot on socket connect)
+   - plus any REST/hook routes your engine needs (`server/routes/phase3.js`
+     and the `/grid/*` block in `server/routes/hooks.js` are the model)
+
+4. **Stage view** — `src/stage/GridStage.jsx`, a pure renderer of the
+   snapshot. Register it in `Stage.jsx` next to the existing branches:
    ```jsx
-   const CUSTOM = { color_clash: ColorClashStage };
-   if (active.ui_component && CUSTOM[active.ui_component]) {
-     const View = CUSTOM[active.ui_component];
-     return <View minigame={active} timer={timer} teams={teams} />;
-   }
+   if (active && grid.active) return <GridStage grid={grid} timer={timer} teams={teams} />;
    ```
-3. Your component reads the same `state`/`timer` from the socket — no new
-   plumbing. Keep the greyscale-world / team-color-only rule (see
-   ARCHITECTURE.md).
+   Subscribe the socket event in `src/hub.jsx` (`socket.on('grid', setGrid)`).
+   Keep the greyscale-world / team-color-only rule (see ARCHITECTURE.md).
+
+5. **Admin panel** — `src/admin/GridPanel.jsx` replaces the generic
+   MinigamePanel on Live while your engine is active (see the branch in
+   `src/admin/Live.jsx`), and `src/admin/Minigames.jsx` gets a settings block
+   keyed on your `ui_component`.
+
+6. **Mole support (free)** — set `has_mole: true` in the game show block and
+   the Part 1 objective system assigns/delivers automatically for any non-quiz
+   minigame. Link the assignment to your round if you want it in your reveal
+   (see `setMoleAssignment` / `refreshMoleReveal` in grid.js).

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useHub, api, Btn, Field, inputCls, useToast } from '../hub.jsx';
 
 // Minutes + seconds pair for timer entry (spec: "5m 30s", not raw seconds).
@@ -124,6 +125,89 @@ function QuizEscapeSettings({ block, onChange }) {
   );
 }
 
+// ---------- Phase 3: Color Grid minigame settings ----------
+function DifficultyFilter({ value, onChange }) {
+  const filter = value ?? ['easy', 'medium', 'hard'];
+  const toggle = (d) => {
+    const next = filter.includes(d) ? filter.filter((x) => x !== d) : [...filter, d];
+    if (next.length) onChange(next);
+  };
+  return (
+    <div>
+      <span className="block text-xs uppercase tracking-wider text-fog mb-1">Puzzle difficulty filter</span>
+      <div className="flex gap-2">
+        {['easy', 'medium', 'hard'].map((d) => (
+          <Btn key={d} className="!min-h-[38px] !px-3 text-xs" kind={filter.includes(d) ? 'primary' : 'default'} onClick={() => toggle(d)}>{d}</Btn>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function GridGameshowSettings({ block, onChange }) {
+  const set = (patch) => onChange({ ...block, ...patch });
+  return (
+    <div className="space-y-3 border-t border-line pt-3">
+      <div className="text-xs uppercase tracking-wider text-fog">Color Grid</div>
+      <NumField label="Reveal seconds" value={block.reveal_seconds} onChange={(v) => set({ reveal_seconds: v })} />
+      <NumField label="Build seconds" value={block.build_seconds} onChange={(v) => set({ build_seconds: v })} />
+      <NumField label="Points per correct cell" value={block.points_per_correct} onChange={(v) => set({ points_per_correct: v })} />
+      <NumField label="Points per wrong cell (±)" value={block.points_per_wrong} onChange={(v) => set({ points_per_wrong: v })} />
+      <NumField label="Perfect-grid bonus" value={block.perfect_bonus} onChange={(v) => set({ perfect_bonus: v })} />
+      {block.has_mole && (
+        <>
+          <NumField label="Mole reward" value={block.mole_reward} onChange={(v) => set({ mole_reward: v })} />
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" className="w-5 h-5" checked={block.randomize_mole_team !== false}
+              onChange={(e) => set({ randomize_mole_team: e.target.checked })} />
+            Randomize the mole team (off = Admin picks from the mole panel)
+          </label>
+        </>
+      )}
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" className="w-5 h-5" checked={!!block.allow_repeat_reveal}
+          onChange={(e) => set({ allow_repeat_reveal: e.target.checked })} />
+        Allow repeat reveal
+      </label>
+      {block.allow_repeat_reveal && (
+        <NumField label="Repeat reveal cost (per team)" value={block.repeat_reveal_cost} onChange={(v) => set({ repeat_reveal_cost: v })} />
+      )}
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" className="w-5 h-5" checked={!!block.show_placements}
+          onChange={(e) => set({ show_placements: e.target.checked })} />
+        Show placements on Stage during the build (never shows correctness)
+      </label>
+      <DifficultyFilter value={block.difficulty_filter} onChange={(v) => set({ difficulty_filter: v })} />
+    </div>
+  );
+}
+
+function GridEscapeSettings({ block, onChange }) {
+  const set = (patch) => onChange({ ...block, ...patch });
+  return (
+    <div className="space-y-3 border-t border-line pt-3">
+      <div className="text-xs uppercase tracking-wider text-fog">Color Grid</div>
+      <NumField label="Reveal seconds" value={block.reveal_seconds} onChange={(v) => set({ reveal_seconds: v })} />
+      <NumField label="Build seconds" value={block.build_seconds} onChange={(v) => set({ build_seconds: v })} />
+      <NumField label="Points per correct cell" value={block.points_per_correct} onChange={(v) => set({ points_per_correct: v })} />
+      <NumField label="Chroma per second remaining" value={block.per_second_remaining} onChange={(v) => set({ per_second_remaining: v })} />
+      <NumField label="Perfect-grid bonus" value={block.perfect_bonus} onChange={(v) => set({ perfect_bonus: v })} />
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" className="w-5 h-5" checked={!!block.require_exact}
+          onChange={(e) => set({ require_exact: e.target.checked })} />
+        Complete the instant the shelf matches exactly (time bonus applies)
+      </label>
+      <NumField label="Repeat reveal cost (0 = free hint)" value={block.repeat_reveal_cost} onChange={(v) => set({ repeat_reveal_cost: v })} />
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" className="w-5 h-5" checked={!!block.show_placements}
+          onChange={(e) => set({ show_placements: e.target.checked })} />
+        Show placements on Stage during the build
+      </label>
+      <DifficultyFilter value={block.difficulty_filter} onChange={(v) => set({ difficulty_filter: v })} />
+    </div>
+  );
+}
+
 function Editor({ minigame, toast, onSaved }) {
   const [m, setM] = useState(minigame);
   useEffect(() => setM(minigame), [minigame]);
@@ -194,10 +278,23 @@ function Editor({ minigame, toast, onSaved }) {
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" className="w-5 h-5" checked={!!m.gameshow.has_mole}
               onChange={(e) => set({ gameshow: { ...m.gameshow, has_mole: e.target.checked } })} />
-            Has a mole {m.ui_component !== 'quiz' && <span className="text-fog">(assignment logic is quiz-only for now)</span>}
+            Has a mole {m.ui_component !== 'quiz' && <span className="text-fog">(text objective, delivered via the mole webhook)</span>}
           </label>
+          {m.ui_component !== 'quiz' && m.ui_component !== 'grid' && m.gameshow.has_mole && (
+            <div className="flex gap-6 items-center">
+              <NumField label="Mole reward (objective default)" value={m.gameshow.mole_reward} onChange={(v) => set({ gameshow: { ...m.gameshow, mole_reward: v } })} />
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" className="w-5 h-5" checked={m.gameshow.randomize_mole_team !== false}
+                  onChange={(e) => set({ gameshow: { ...m.gameshow, randomize_mole_team: e.target.checked } })} />
+                Randomize team
+              </label>
+            </div>
+          )}
           {m.ui_component === 'quiz' && (
             <QuizGameshowSettings block={m.gameshow} onChange={(b) => set({ gameshow: b })} />
+          )}
+          {m.ui_component === 'grid' && (
+            <GridGameshowSettings block={m.gameshow} onChange={(b) => set({ gameshow: b })} />
           )}
         </div>
       )}
@@ -212,6 +309,22 @@ function Editor({ minigame, toast, onSaved }) {
           {m.ui_component === 'quiz' && (
             <QuizEscapeSettings block={m.escaperoom} onChange={(b) => set({ escaperoom: b })} />
           )}
+          {m.ui_component === 'grid' && (
+            <GridEscapeSettings block={m.escaperoom} onChange={(b) => set({ escaperoom: b })} />
+          )}
+        </div>
+      )}
+
+      {m.ui_component === 'grid' && (
+        <div className="rounded-xl border border-line p-4 flex items-center justify-between">
+          <div>
+            <div className="font-semibold">Puzzles</div>
+            <div className="text-xs text-fog">Author the target patterns this game draws from.</div>
+          </div>
+          <Link to="/admin/grid-puzzles"
+            className="min-h-[44px] px-4 rounded-lg bg-bone text-ink font-semibold text-sm flex items-center hover:bg-white">
+            Open puzzle builder →
+          </Link>
         </div>
       )}
 

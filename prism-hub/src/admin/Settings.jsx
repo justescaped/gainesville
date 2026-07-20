@@ -119,6 +119,13 @@ export default function Settings() {
         <div className="text-xs text-fog -mt-2">
           When you save a minigame, its full config is POSTed here so Pi-hosted minigames can pick up rule changes. Leave blank to skip.
         </div>
+        <Field label="Mole delivery URL">
+          <input className={inputCls} placeholder="http://nodered.local:1880/prism/mole" value={s.mole_webhook_url} onChange={(e) => set({ mole_webhook_url: e.target.value })} />
+        </Field>
+        <div className="text-xs text-fog -mt-2">
+          <code className="font-mono">mole.assigned</code> / <code className="font-mono">mole.resolved</code> events go here — usually a different
+          device than everything else (bench screen, receipt printer, TTS). Blank = the base URL above.
+        </div>
       </div>
 
       <Btn kind="primary" className="w-full" onClick={save}>Save settings</Btn>

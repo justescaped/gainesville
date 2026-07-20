@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useHub, socket, teamHex, fmtTime } from '../hub.jsx';
 import QuizStage from './QuizStage.jsx';
+import GridStage from './GridStage.jsx';
 
 // The Stage is the only screen the audience sees. Design rule: the world is
 // greyscale; the ONLY saturated colour in the room comes from team identity.
@@ -80,6 +81,34 @@ function ActiveMinigame({ minigame, timer, teams }) {
   );
 }
 
+// ---- escape room, after a session ends: the end-of-run reveal ----
+function RunEndScreen({ run }) {
+  const record = run.rank_alltime === 1;
+  return (
+    <div className="h-full flex flex-col items-center justify-center gap-5">
+      <div className="text-bone/40 uppercase tracking-[0.4em] text-2xl">Run complete</div>
+      <div className="text-5xl font-semibold text-bone/90">{run.team_name}</div>
+      <div className="num text-[11rem] leading-none font-black" style={{ color: teamHex('solo') }}>{run.final_chroma}</div>
+      <div className="text-bone/50 uppercase tracking-[0.3em] text-lg">Chroma · {fmtTime(run.duration_sec * 1000)} elapsed</div>
+      {record ? (
+        <div className="text-tyellow text-5xl font-black tracking-tight banner-in">★ NEW ALL-TIME RECORD ★</div>
+      ) : run.made_top25 ? (
+        <div className="text-tgreen text-4xl font-bold banner-in">Top 25 all-time — #{run.rank_alltime}</div>
+      ) : null}
+      <div className="flex gap-16 mt-2">
+        <div className="text-center">
+          <div className="text-bone/40 uppercase tracking-widest text-sm">All-time rank</div>
+          <div className="num text-5xl font-bold text-bone/90">#{run.rank_alltime}</div>
+        </div>
+        <div className="text-center">
+          <div className="text-bone/40 uppercase tracking-widest text-sm">This month</div>
+          <div className="num text-5xl font-bold text-bone/90">#{run.rank_monthly}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---- escape room, between minigames: solo team vs the record ----
 function SoloBoard({ team, bests }) {
   return (
@@ -103,7 +132,7 @@ function SoloBoard({ team, bests }) {
 }
 
 export default function Stage() {
-  const { state, timer, quiz, banner } = useHub();
+  const { state, timer, quiz, grid, banner } = useHub();
 
   // Physical button box: it's a USB HID keyboard plugged into the machine
   // showing this page. Forward every non-repeat keydown's raw event.code to the
@@ -118,13 +147,14 @@ export default function Stage() {
   }, []);
 
   if (!state) return <div className="h-full flex items-center justify-center text-fog">Connecting…</div>;
-  const { session, teams, minigames, bests } = state;
+  const { session, teams, minigames, bests, last_run } = state;
 
   return (
     <div className="h-full bg-ink text-bone overflow-hidden cursor-none select-none relative">
       <Banner banner={banner} />
 
-      {!session && (
+      {!session && last_run && <RunEndScreen run={last_run} />}
+      {!session && !last_run && (
         <div className="h-full flex flex-col items-center justify-center gap-4">
           <div className="text-7xl font-black tracking-tight">PRISM DILEMMA</div>
           <div className="text-fog uppercase tracking-[0.4em]">Standby</div>
@@ -133,8 +163,9 @@ export default function Stage() {
 
       {session && (() => {
         const active = session.active_minigame_id ? minigames.find((m) => m.id === session.active_minigame_id) : null;
-        // Quiz minigames take over with their own state machine views.
+        // Engine minigames take over with their own state machine views.
         if (active && quiz.active) return <QuizStage quiz={quiz} teams={teams} />;
+        if (active && grid.active) return <GridStage grid={grid} timer={timer} teams={teams} />;
         if (active) return <ActiveMinigame minigame={active} timer={timer} teams={teams} />;
 
         if (session.mode === 'escaperoom') {

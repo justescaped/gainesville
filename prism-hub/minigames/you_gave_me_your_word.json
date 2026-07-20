@@ -3,18 +3,37 @@
   "name": "You Gave Me Your Word!",
   "image": null,
   "round_number": 1,
-  "enabled_modes": ["gameshow", "escaperoom"],
+  "enabled_modes": [
+    "gameshow",
+    "escaperoom"
+  ],
   "ui_component": null,
   "gameshow": {
     "timer_seconds": 300,
-    "chroma_rules": { "win": 200, "second": 100, "third": 50, "last": 0, "participation": 25 },
+    "chroma_rules": {
+      "win": 200,
+      "second": 100,
+      "third": 50,
+      "last": 0,
+      "participation": 25
+    },
     "has_mole": true,
-    "custom": {}
+    "custom": {},
+    "mole_reward": 250,
+    "randomize_mole_team": true
   },
   "escaperoom": {
     "timer_seconds": 420,
-    "chroma_rules": { "complete": 150, "per_second_remaining": 1, "penalty": -50 },
+    "chroma_rules": {
+      "complete": 150,
+      "per_second_remaining": 1,
+      "penalty": -50
+    },
     "custom": {}
   },
-  "nodered": { "on_start": "", "on_end": "", "inbound_key": "ygmyw" }
+  "nodered": {
+    "on_start": "",
+    "on_end": "",
+    "inbound_key": "ygmyw"
+  }
 }

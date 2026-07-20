@@ -174,7 +174,7 @@ function launch({ sessionId, minigameId, mode, manifest, teams }) {
     turnIndex: -1,                           // advanced to 0 on first question
     answeringTeamId: null, passedFromTeamId: null, wasPassed: false,
     question: null, questionValue: 0, deadline: 0, feedback: null,
-    moleTeamId: null, endedPayload: null,
+    moleTeamId: null, moleAssignmentId: null, endedPayload: null,
     attemptNo: 1, previousScores: [], pool: null,
     finalized: false
   };
@@ -190,6 +190,7 @@ function launch({ sessionId, minigameId, mode, manifest, teams }) {
     if (settings.has_mole) {
       quiz.moleTeamId = teams[Math.floor(Math.random() * teams.length)].id;
       fireNodeRed('quiz.mole_assigned', { team: teams.find((t) => t.id === quiz.moleTeamId).color });
+      assignMoleRecord(quiz.moleTeamId);
     }
     fireNodeRed('quiz.started', { minigame_id: minigameId, mode, team_count: teams.length });
     nextTurn();
@@ -415,7 +416,33 @@ function adminSetMole(teamId) {
   if (!quiz || quiz.mode !== 'gameshow') return;
   quiz.moleTeamId = teamId ?? null;
   if (teamId) fireNodeRed('quiz.mole_assigned', { team: quiz.teams.find((t) => t.id === teamId)?.color });
+  // Phase 3: keep the mole_assignments archive + delivery device in sync.
+  const mole = require('./mole');
+  if (teamId) {
+    assignMoleRecord(teamId);
+  } else if (quiz.moleAssignmentId) {
+    try { mole.clear(quiz.moleAssignmentId); } catch { /* already resolved */ }
+    quiz.moleAssignmentId = null;
+  }
   push();
+}
+
+// Phase 3 retrofit (§1.6): the trivia exact-score mole stays auto-scored, but
+// its goal is delivered through the same mole.assigned pipeline as every other
+// minigame, with a generated objective text. auto=true hides Hit/Missed.
+function assignMoleRecord(teamId) {
+  const mole = require('./mole');
+  const a = mole.assign({
+    sessionId: quiz.sessionId,
+    minigameId: quiz.minigameId,
+    teamId,
+    objectiveOverride: {
+      text: `Finish this game with exactly ${quiz.settings.mole_target} points.`,
+      reward: quiz.settings.mole_reward ?? 0,
+      auto: true
+    }
+  });
+  quiz.moleAssignmentId = a.id;
 }
 
 // ============================================================
@@ -433,6 +460,8 @@ function endQuiz(cause) {
       writeQuizChroma(quiz.moleTeamId, quiz.settings.mole_reward ?? 0,
         `Mole hit ${quiz.settings.mole_target} exactly — reward`);
     }
+    // Close the Phase 3 archive record; the reward was already paid above.
+    if (quiz.moleAssignmentId) require('./mole').autoResolve(quiz.moleAssignmentId, moleHit);
   }
 
   if (quiz.runId) {

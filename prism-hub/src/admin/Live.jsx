@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useHub, api, Btn, ColorDot, teamHex, fmtTime, inputCls, useToast } from '../hub.jsx';
 import LedgerFeed from './LedgerFeed.jsx';
 import QuizPanel from './QuizPanel.jsx';
+import GridPanel from './GridPanel.jsx';
+import MolePanel from './MolePanel.jsx';
 
 // ---------- mode selector (Admin home when no session exists) ----------
 function ModeSelector({ toast }) {
@@ -76,12 +78,13 @@ function TeamCard({ team, toast }) {
 }
 
 // ---------- active minigame panel ----------
-function MinigamePanel({ session, minigame, timer, toast }) {
+function MinigamePanel({ session, minigame, timer, mole, teams, toast }) {
   const call = (path, body) => api(path, 'POST', body).catch((e) => toast(e.message));
   const mode = session.active_minigame_mode;
   const canToggle = minigame.enabled_modes.length > 1;
+  const moleCapable = mode === 'gameshow' && !!minigame.gameshow?.has_mole;
   return (
-    <div className="rounded-xl border border-line bg-panel p-4 flex flex-col h-full">
+    <div className="rounded-xl border border-line bg-panel p-4 flex flex-col h-full gap-3 overflow-y-auto no-scrollbar">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-lg font-bold leading-tight">{minigame.name}</div>
@@ -110,13 +113,14 @@ function MinigamePanel({ session, minigame, timer, toast }) {
         <Btn onClick={() => call('/timer', { action: 'add', seconds: 30 })}>+30s</Btn>
         <Btn onClick={() => call('/timer', { action: 'subtract', seconds: 30 })}>−30s</Btn>
       </div>
+      {moleCapable && <MolePanel mole={mole} teams={teams} hasMole toast={toast} />}
     </div>
   );
 }
 
 // ---------- main Live screen ----------
 export default function Live() {
-  const { state, timer, quiz } = useHub();
+  const { state, timer, quiz, grid } = useHub();
   const [toast, toastNode] = useToast();
   const [drawer, setDrawer] = useState(false);
   if (!state) return null;
@@ -162,8 +166,10 @@ export default function Live() {
         <div className="flex-1 min-w-0">
           {active && quiz.active
             ? <QuizPanel quiz={quiz} teams={teams} timer={timer} toast={toast} />
+            : active && grid.active
+              ? <GridPanel grid={grid} state={state} timer={timer} toast={toast} />
             : active
-              ? <MinigamePanel session={session} minigame={active} timer={timer} toast={toast} />
+              ? <MinigamePanel session={session} minigame={active} timer={timer} mole={state.mole} teams={teams} toast={toast} />
               : (
                 <div className="h-full rounded-xl border border-dashed border-line flex flex-col items-center justify-center text-fog gap-1">
                   <div className="text-lg">No minigame running</div>

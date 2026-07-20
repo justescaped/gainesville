@@ -1,0 +1,47 @@
+{
+  "id": "color_grid",
+  "name": "Color Grid",
+  "image": null,
+  "round_number": 6,
+  "enabled_modes": [
+    "gameshow",
+    "escaperoom"
+  ],
+  "ui_component": "grid",
+  "gameshow": {
+    "timer_seconds": 90,
+    "chroma_rules": {},
+    "has_mole": true,
+    "reveal_seconds": 10,
+    "build_seconds": 90,
+    "points_per_correct": 25,
+    "points_per_wrong": 0,
+    "perfect_bonus": 100,
+    "mole_reward": 250,
+    "randomize_mole_team": true,
+    "allow_repeat_reveal": false,
+    "repeat_reveal_cost": 100,
+    "show_placements": false,
+    "difficulty_filter": ["easy", "medium", "hard"],
+    "custom": {}
+  },
+  "escaperoom": {
+    "timer_seconds": 180,
+    "chroma_rules": {},
+    "reveal_seconds": 15,
+    "build_seconds": 180,
+    "points_per_correct": 25,
+    "per_second_remaining": 2,
+    "perfect_bonus": 200,
+    "require_exact": true,
+    "repeat_reveal_cost": 0,
+    "show_placements": false,
+    "difficulty_filter": ["easy", "medium", "hard"],
+    "custom": {}
+  },
+  "nodered": {
+    "on_start": "",
+    "on_end": "",
+    "inbound_key": "color_grid"
+  }
+}

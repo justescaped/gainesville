@@ -4,6 +4,9 @@ import { useHub, api, Btn, inputCls } from '../hub.jsx';
 import Live from './Live.jsx';
 import Minigames from './Minigames.jsx';
 import QuestionBanks from './QuestionBanks.jsx';
+import MoleObjectives from './MoleObjectives.jsx';
+import GridPuzzles from './GridPuzzles.jsx';
+import History from './History.jsx';
 import Territories from './Territories.jsx';
 import Powerups from './Powerups.jsx';
 import Teams from './Teams.jsx';
@@ -15,10 +18,12 @@ const NAV = [
   ['', 'Live'],
   ['minigames', 'Minigames'],
   ['questions', 'Question Banks'],
+  ['mole', 'Mole Objectives'],
   ['territories', 'Territories'],
   ['powerups', 'Power-ups'],
   ['teams', 'Teams'],
   ['ledger', 'Ledger'],
+  ['history', 'History'],
   ['nodered', 'Node-RED'],
   ['settings', 'Settings']
 ];
@@ -82,6 +87,9 @@ export default function AdminShell() {
           <Route index element={<Live />} />
           <Route path="minigames" element={<Minigames />} />
           <Route path="questions" element={<QuestionBanks />} />
+          <Route path="mole" element={<MoleObjectives />} />
+          <Route path="grid-puzzles" element={<GridPuzzles />} />
+          <Route path="history" element={<History />} />
           <Route path="territories" element={<Territories />} />
           <Route path="powerups" element={<Powerups />} />
           <Route path="teams" element={<Teams />} />

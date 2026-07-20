@@ -64,4 +64,25 @@ router.post('/banner', handle((req) => {
   pushBanner(req.body.text, req.body.duration || 8);
 }));
 
+// ---------- Phase 3: Color Grid RFID input ----------
+// row/col are zero-indexed from the TOP-LEFT as players face the shelves.
+// See docs/COLOR_GRID.md for the addressing diagram before wiring a Pi.
+const gridEngine = require('../grid');
+
+// POST /api/hook/grid/placement  { row, col, color, tag_id, team }
+router.post('/grid/placement', handle((req) => {
+  gridEngine.recordPlacement({
+    row: req.body.row, col: req.body.col, color: req.body.color,
+    tagId: req.body.tag_id || null, teamRef: req.body.team ?? null
+  });
+}));
+
+// POST /api/hook/grid/state  { cells: [[...]] } — full shelf resync
+router.post('/grid/state', handle((req) => {
+  gridEngine.setFullState(req.body.cells);
+}));
+
+// POST /api/hook/grid/score  {} — force immediate scoring
+router.post('/grid/score', handle(() => gridEngine.score('nodered_score')));
+
 module.exports = router;

@@ -7,6 +7,12 @@ const { allManifests } = require('./core');
 let io = null;
 function setIO(socketServer) { io = socketServer; }
 
+// Phase 3: end-of-run summary for the Stage. Set when an escape-room session
+// ends, cleared when the next session starts. In-memory only — the permanent
+// record lives in run_history.
+let lastRun = null;
+function setLastRun(summary) { lastRun = summary; }
+
 function buildState() {
   const session = activeSession();
   let teams = [];
@@ -40,10 +46,30 @@ function buildState() {
     }
   }
 
+  // Phase 3: the newest unresolved mole assignment, for the Admin-only
+  // collapsed panel. The Stage NEVER renders this before the scoring reveal.
+  let mole = null;
+  if (session) {
+    const a = db.prepare(
+      "SELECT * FROM mole_assignments WHERE session_id = ? AND outcome = 'pending' ORDER BY assigned_at DESC, id DESC LIMIT 1")
+      .get(session.id);
+    if (a) {
+      const t = teams.find((x) => x.id === a.team_id);
+      mole = {
+        id: a.id, minigame_id: a.minigame_id, round_number: a.round_number,
+        team_id: a.team_id, team_name: t?.name, team_color: t?.color,
+        objective_text: a.objective_text, reward: a.reward,
+        auto_scored: !!a.auto_scored, delivered: !!a.delivered, outcome: a.outcome
+      };
+    }
+  }
+
   return {
     session,
     teams,
     quiz_attempts,
+    mole,
+    last_run: session ? null : lastRun,
     territories: db.prepare('SELECT * FROM territories ORDER BY id').all(),
     minigames: allManifests(),
     powerup_defs: db.prepare('SELECT * FROM powerup_defs ORDER BY rowid').all()
@@ -60,4 +86,4 @@ function pushBanner(text, duration = 8) {
   if (io) io.emit('banner', { id: Date.now(), text: String(text), duration: Number(duration) || 8 });
 }
 
-module.exports = { setIO, buildState, broadcastState, pushBanner, getIO: () => io };
+module.exports = { setIO, buildState, broadcastState, pushBanner, setLastRun, getIO: () => io };

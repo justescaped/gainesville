@@ -14,6 +14,7 @@ export function HubProvider({ children }) {
   const [state, setState] = useState(null);
   const [timer, setTimer] = useState({ duration_ms: 0, remaining_ms: 0, running: false, expired: false });
   const [quiz, setQuiz] = useState({ active: false });
+  const [grid, setGrid] = useState({ active: false });
   const [banner, setBanner] = useState(null);
   const [connected, setConnected] = useState(false);
   const bannerTimeout = useRef(null);
@@ -24,15 +25,16 @@ export function HubProvider({ children }) {
     socket.on('state', setState);
     socket.on('timer', setTimer);
     socket.on('quiz', setQuiz);
+    socket.on('grid', setGrid);
     socket.on('banner', (b) => {
       setBanner(b);
       clearTimeout(bannerTimeout.current);
       bannerTimeout.current = setTimeout(() => setBanner(null), (b.duration || 8) * 1000);
     });
-    return () => { socket.off('state'); socket.off('timer'); socket.off('quiz'); socket.off('banner'); };
+    return () => { socket.off('state'); socket.off('timer'); socket.off('quiz'); socket.off('grid'); socket.off('banner'); };
   }, []);
 
-  return <HubCtx.Provider value={{ state, timer, quiz, banner, connected }}>{children}</HubCtx.Provider>;
+  return <HubCtx.Provider value={{ state, timer, quiz, grid, banner, connected }}>{children}</HubCtx.Provider>;
 }
 
 export const useHub = () => useContext(HubCtx);
@@ -51,6 +53,10 @@ export async function api(path, method = 'GET', body) {
 // ---------- team color helpers ----------
 export const TEAM_HEX = { red: '#FF3B3B', blue: '#2E86FF', green: '#21D07A', yellow: '#FFC61A', solo: '#E8E8E6', none: '#3A3A3F' };
 export const teamHex = (color) => TEAM_HEX[color] || '#8A8A90';
+
+// Color Grid: every color pairs with a distinct shape glyph, so the pattern
+// still reads for colorblind viewers and on washed-out livestream encoding.
+export const GRID_GLYPH = { red: '▲', blue: '■', green: '●', yellow: '◆' };
 
 export function fmtTime(ms) {
   const total = Math.max(0, Math.ceil(ms / 1000));

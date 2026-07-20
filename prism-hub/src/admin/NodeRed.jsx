@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { api, Btn, useToast } from '../hub.jsx';
 
-const TEST_EVENTS = ['session_started', 'session_ended', 'minigame_start', 'minigame_end', 'timer_expired', 'territory_changed', 'powerup_used', 'chroma_changed'];
+const TEST_EVENTS = [
+  'session_started', 'session_ended', 'minigame_start', 'minigame_end', 'timer_expired',
+  'territory_changed', 'powerup_used', 'chroma_changed',
+  'mole.assigned', 'mole.resolved', 'grid.started', 'grid.scored', 'run.completed', 'run.record_set'
+];
 
 function LogTable({ rows, showStatus }) {
   const [open, setOpen] = useState(null);

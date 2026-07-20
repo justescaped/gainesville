@@ -153,3 +153,56 @@ superseded escape-room attempt's entries can be voided as a group.
 ### settings additions
 `button_map` — JSON `{A,B,C,D,PASS} → KeyboardEvent.code`, edited in
 Settings → Input (see `BUTTON_HARDWARE.md`).
+
+# Phase 3 additions
+
+### mole_objectives
+`id` (uuid), `text`, `minigame_ids` (JSON array — **empty = any minigame**),
+`modes` (JSON, `["gameshow"]`), `reward` (null = use the minigame's
+`mole_reward`), `weight` (draw-odds multiplier, ≥1), `active`, `created_at`.
+Soft-deleted once referenced by an assignment.
+
+### mole_assignments
+One row per mole assignment. `session_id`, `minigame_id`, `round_number`,
+`team_id`, `objective_id` (null for generated trivia objectives),
+**`objective_text` — snapshotted so editing the library never rewrites the
+archive**, `reward`, `outcome` (`pending`/`hit`/`missed`/`voided`),
+`auto_scored` (1 = trivia exact-score mole, resolves itself),
+`delivered` (did the `mole.assigned` webhook succeed), `assigned_at`,
+`resolved_at`. A new assignment for the same session + minigame voids any
+still-pending one.
+
+### grid_puzzles
+`id` (uuid), `name`, `rows`, `cols` (2–8 each), `pattern` (JSON 2D array of
+`red|blue|green|yellow|empty`), `difficulty` (`easy|medium|hard`), `modes`
+(JSON), `active`, `created_at`. Soft-deleted once used by a round.
+
+### grid_rounds
+One row per Color Grid playthrough. `session_id`, `puzzle_id`, `mode`,
+`mole_assignment_id` (FK to Part 1), `reveal_seconds`, `final_state` (JSON
+snapshot at scoring), `scores` (JSON `{team_id: correct_count}`),
+`started_at`, `ended_at`.
+
+### grid_placements — APPEND-ONLY, like the ledger
+Every physical placement event: `round_id`, `row`, `col` (zero-indexed from
+top-left as players face the shelves), `color`, `tag_id` (RFID, nullable),
+`team_id` (nullable), `placed_at`. Current shelf state = latest placement per
+cell; the full sequence replays a round for dispute resolution on stream.
+
+### minigame_launches
+`session_id`, `minigame_id`, `mode`, `launched_at`. Written on every launch so
+`run_history.minigames_played` is complete even for games that never produced
+a Chroma entry.
+
+### run_history additions (migration)
+`player_names` (JSON array, Admin-entered after the run), `minigames_played`
+(JSON array, filled automatically at session end), `notes`, `visible`
+(**0 hides staff test runs from every public board and from `bests()`** —
+the row is kept, never deleted). Existing columns unchanged; migrated via
+`ALTER TABLE` on first Phase 3 boot.
+
+### settings additions
+`mole_webhook_url` — dedicated delivery URL for `mole.*` events; blank falls
+back to `<base>/prism/<event>`. It exists because the mole's delivery device
+(bench screen / receipt printer / TTS) is usually not the same box as the
+lighting controller.

@@ -39,14 +39,15 @@ function getManifest(id) { return manifests.get(id) || null; }
 // ============================================================
 // NODE-RED OUTBOUND — fire-and-forget HTTP POSTs, 2s timeout.
 // A Node-RED failure must NEVER block or crash the Hub, so every
-// error path here ends in a log row, not a throw.
+// error path here ends in a log row, not a throw. Resolves true when
+// the call got a 2xx/3xx — the mole system uses this for `delivered`.
 // ============================================================
 async function fireNodeRed(event, payload, urlOverride) {
   const base = getSetting('nodered_base_url').trim().replace(/\/$/, '');
   const url = (urlOverride && urlOverride.trim()) || (base ? `${base}/prism/${event}` : '');
   if (!url) {
     logNodeRed('out', event, null, payload, 'skipped (no URL configured)');
-    return;
+    return false;
   }
   const body = { event, ts: new Date().toISOString(), ...payload };
   const controller = new AbortController();
@@ -59,8 +60,10 @@ async function fireNodeRed(event, payload, urlOverride) {
       signal: controller.signal
     });
     logNodeRed('out', event, url, body, res.status);
+    return res.status < 400;
   } catch (err) {
     logNodeRed('out', event, url, body, `error: ${err.name === 'AbortError' ? 'timeout (2s)' : err.message}`);
+    return false;
   } finally {
     clearTimeout(timeout);
   }

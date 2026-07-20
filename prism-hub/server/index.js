@@ -12,6 +12,7 @@ const { db, activeSession, getSetting, setSetting } = require('./db');
 const { createTimer, fireNodeRed, getManifest } = require('./core');
 const state = require('./state');
 const quizEngine = require('./quiz');
+const gridEngine = require('./grid');
 
 const PORT = process.env.PORT || 3000;
 
@@ -41,6 +42,7 @@ const timer = createTimer(
       onEndFiredForActive = true;
     }
     quizEngine.onTimerExpired(); // ends a running quiz naturally
+    gridEngine.onTimerExpired(); // scores a running grid build naturally
   }
 );
 
@@ -50,6 +52,7 @@ const timer = createTimer(
 // the Stage never decides anything. Admin fallback buttons enter through the
 // same pressAction() so behavior is identical.
 quizEngine.setEmitter((snap) => io.emit('quiz', snap));
+gridEngine.setEmitter((snap) => io.emit('grid', snap));
 
 const inputState = { learnArm: null, recent: [], lastPress: {} };
 
@@ -95,6 +98,7 @@ app.locals.input = { state: inputState, pressAction };
 // ---------- API routes ----------
 app.use('/api/hook', require('./routes/hooks')); // inbound Node-RED (token-gated)
 app.use('/api', require('./routes/quizapi'));    // Phase 2: question banks + quiz control + input
+app.use('/api', require('./routes/phase3'));     // Phase 3: mole objectives + grid + history
 app.use('/api', require('./routes/api'));        // admin API
 
 // ---------- static: uploads + built front end ----------
@@ -120,6 +124,7 @@ io.on('connection', (socket) => {
   socket.emit('state', state.buildState());
   socket.emit('timer', timer.snapshot());
   socket.emit('quiz', quizEngine.snapshot());
+  socket.emit('grid', gridEngine.snapshot());
   // Raw keystrokes from the Stage machine's USB button box.
   socket.on('raw_button', (d) => {
     if (d && typeof d.code === 'string' && d.code.length > 0 && d.code.length <= 40) handleRawCode(d.code);
