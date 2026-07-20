@@ -1,0 +1,37 @@
+{
+  "id": "puzzle_pass",
+  "name": "Puzzle Pass",
+  "image": null,
+  "round_number": 5,
+  "enabled_modes": ["gameshow", "escaperoom"],
+  "ui_component": "quiz",
+  "gameshow": {
+    "timer_seconds": 600,
+    "chroma_rules": {},
+    "has_mole": true,
+    "question_seconds": 15,
+    "randomize_points": true,
+    "points_min": 25,
+    "points_max": 200,
+    "streak_ladder": { "2": 50, "3": 100, "4": 200, "5": 350 },
+    "max_passes_per_team": 3,
+    "mole_target": 500,
+    "mole_reward": 300,
+    "question_count": 20,
+    "custom": {}
+  },
+  "escaperoom": {
+    "timer_seconds": 600,
+    "chroma_rules": {},
+    "question_seconds": 20,
+    "randomize_points": false,
+    "points_min": 25,
+    "points_max": 200,
+    "streak_ladder": { "2": 50, "3": 100, "4": 200, "5": 350 },
+    "categories_per_attempt": 4,
+    "max_attempts": 3,
+    "questions_per_category": 5,
+    "custom": {}
+  },
+  "nodered": { "on_start": "", "on_end": "", "inbound_key": "puzzle_pass" }
+}
